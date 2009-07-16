@@ -27,9 +27,13 @@ def index(req, p):
     csv_location = req.settings[u'csv_location']
     files = [unicode(f) 
                 for f in os.listdir(csv_location) if not f.endswith('json')]
-    with html.ul(p):
-       for file in files:
-        p(html.li(html.a(view_csv.url(file), file)))
+    p(template_index(files))
+
+@webify.template()
+def template_index(p, files):
+    with p(html.ul()):
+        for file in files:
+            p(html.li(html.a(view_csv.url(file), file)))
 
 import csv
 import StringIO
@@ -79,7 +83,7 @@ def new_properties(req, p):
     raw_data = extract_raw_data(table)
     clean_data = clean_raw_data(raw_data, cleaners, filter_names)
 
-    template_clean_data(p, clean_data, features, items, cleaners_names, filter_names)
+    p(template_clean_data(clean_data, features, items, cleaners_names, filter_names))
 
 import simplejson
 @app.subapp()
@@ -103,12 +107,13 @@ def new_data(req, p):
         feature_id = int(f[8:])
         value = data[u'features'][f]
         if value is not None:
-            equation[feature_id] = float(value)
+            # Normalize subtract 500 to increase effect
+            equation[feature_id] = float(value) - 500
 
     rankings, normalized_equation = calculate_rankings(normalized_data, equation)
 
-    template_rankings(p, items, rankings)
-    template_equation(p, normalized_equation, features)
+    p(template_rankings(items, rankings))
+    p(template_equation(normalized_equation, features))
 
 def read_table(csv_location, short_code):
     assert(short_code_valid(short_code))
@@ -143,13 +148,17 @@ def view_csv(req, p, short_code):
     
     rankings, normalized_equation = calculate_rankings(normalized_data, equation)
 
-    with html.head(p):
+    p(template_view_csv(short_code, clean_data, filter_names, cleaners_names, table, features, items, rankings, normalized_equation))
+
+@webify.template()
+def template_view_csv(p, short_code, clean_data, filter_names, cleaners_names, table, features, items, rankings, normalized_equation):
+    with p(html.head()):
         p(html.title('%s | AutoRanker' % short_code))
         #p(u'<script src="http://www.google.com/jsapi"></script>')
         p(u'<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.3.2/jquery.min.js"></script>')
         p(u'<script src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.7.2/jquery-ui.min.js"></script>')
         p(u'<script src="http://www.json.org/json2.js"></script>')
-        with html.script_block(p):
+        with p(html.script_block()):
             #p(u'google.load("jquery", "1.3.2");google.load("jqueryui", "1.7.2");')
             p(u'''
                var features = {};
@@ -276,44 +285,45 @@ def view_csv(req, p, short_code):
             </style>
         ''')
     p(u'<input type="hidden" id="short_code" value="%s" />' % short_code)
-    with html.div(p, {u'id':u'full_data'}):
-        template_clean_data(p, clean_data, features, items, cleaners_names, filter_names)
+    with p(html.div({u'id':u'full_data'})):
+        p.sub(template_clean_data(clean_data, features, items, cleaners_names, filter_names))
     p(html.br())
-    with html.table(p):
-        with html.tr(p):
-            with html.td_block(p, {'width':'67%', 'valign':'top'}):
+    with p(html.table()):
+        with p(html.tr()):
+            with p(html.td_block({'width':'67%', 'valign':'top'})):
                 p(u'<table><tr><td width="34%" valign="top">')
-                template_show_features(p, features)
+                p.sub(template_show_features(features))
                 p(u'</td><td width="66%" valign="top">')
                 p(html.h2('Selected Features:'))
-                with html.div(p, {u'id':u'features'}):
+                with p(html.div({u'id':u'features'})):
                     pass
                 p(u'</td></tr></table>')
                 '''
                 p(html.br())
                 p(u'<table><tr><td width="100%" valign="top">')
-                template_equation(p, normalized_equation, features)
+                p(template_equation(normalized_equation, features))
                 p(u'</td></tr></table>')
                 '''
-            with html.td_block(p, {u'width':u'34%', u'valign':u'top'}):
-                with html.div(p, {u'id':u'rankings'}):
-                    template_rankings(p, items, rankings)
-                    template_equation(p, normalized_equation, features)
-    p(template_upload_form(short_code))
+            with p(html.td_block({u'width':u'34%', u'valign':u'top'})):
+                with p(html.div({u'id':u'rankings'})):
+                    p.sub(template_rankings(items, rankings))
+                    p.sub(template_equation(normalized_equation, features))
+    p.sub(template_upload_form(short_code))
 
+@webify.template()
 def template_rankings(p, items, rankings):
-    with html.table(p):
-        with html.tr(p):
-            with html.td_block(p, {u'valign':u'top'}):
+    with p(html.table()):
+        with p(html.tr()):
+            with p(html.td_block({u'valign':u'top'})):
                 p(html.h2('Rankings:'))
-            with html.td_block(p, {u'valign':u'top'}):
+            with p(html.td_block({u'valign':u'top'})):
                 p(u'&nbsp;')
                 p(u'<button id="rerank">Re-rank</button>')
-            with html.td_block(p, {u'valign':u'top'}):
+            with p(html.td_block({u'valign':u'top'})):
                 p(u'<img src="http://www.labmeeting.com/images/upload/spinner.gif" style="display:none;" id="loading" />')
-    r = ['%s (%s)' % (html.b(items[i]), html.span_smaller(score)) 
+    r = ['%s (%s)' % (html.b(items[i]), html.span_smaller('%s' % score))
                                     for score,i in rankings]
-    partial_list(p, r)
+    p.sub(partial_list(r))
 
 def calculate_rankings(normalized_data, equation):
     elements = sorted([(f, equation[f]) for f in equation])
@@ -430,31 +440,34 @@ def clean_raw_data(raw_data, cleaners, filter_names):
     return clean_data
 
 
-
-
+@webify.template()
 def template_equation(p, equation, features):
     elements = reversed(sorted([(equation[c], c) for c in equation]))
     p(html.h2(u'Equation:'))
-    with html.p_block(p, {u'style':
-                          u'font-family:sans;font-size:14pt;font-weight:bold;'}):
+    with p(html.p_block({u'style':
+                         u'font-family:sans;font-size:14pt;font-weight:bold;'})):
         p(u'= ' + u' + '.join([u'%s×[%s]<br />' % (unicode(weight), 
                                              html.span_smaller(features[column]))
                                                 for weight,column in elements
                                                     if column is not None]))
         p(u' + %s' % equation[None])
     
+@webify.template()
 def template_show_features(p, features):
     p(html.h2(u'All features:'))
-    draggable_features(p, zip(range(len(features)), features), u'all_features')
+    p.sub(draggable_features(zip(range(len(features)), features), u'all_features'))
 
+
+@webify.template()
 def draggable_features(p, features, id):
-    with html.div(p, {u'id':id}):
+    with p(html.div({u'id':id})):
         for i,f in features:
-            with html.div(p, {u'id':u'feature_%s' % i}):
+            with p(html.div({u'id':u'feature_%s' % i})):
                 p(f)
 
+@webify.template()
 def partial_list(p, things):
-    with html.ol(p):
+    with p(html.ol()):
         for t in things:
             p(html.li(t))
 
@@ -462,15 +475,16 @@ class ChangedFloat(float):
     def set_original(self, original):
         self.original = original
 
+@webify.template()
 def template_clean_data(p, clean_data, features, items, cleaners_names, filter_names):
     p(html.h2(u'Clean data:'))
-    with html.div(p, {u'id':u'clean_data', 
-                      u'style':u'height:23em;overflow:scroll;'}):
-        with html.table(p):
-            with html.tr(p):
+    with p(html.div({u'id':u'clean_data', 
+                      u'style':u'height:20em;overflow:scroll;'})):
+        with p(html.table()):
+            with p(html.tr()):
                 p(html.td('&nbsp;'))
                 for i,f in enumerate(features):
-                    with html.td_block(p):
+                    with p(html.td_block()):
                         p(html.b(u'Missing:'))
                         p(html.br())
                         p(u'<select class="cleaners">')
@@ -488,7 +502,7 @@ def template_clean_data(p, clean_data, features, items, cleaners_names, filter_n
                         p(html.br())
                         p(html.b(u'Filters:'))
                         p(html.br())
-                        with html.div(p, {u'class':u'filters'}):
+                        with p(html.div({u'class':u'filters'})):
                             for f in filter_funcs:
                                 p(u'<input type="checkbox"')
                                 if f in filter_names[i]:
@@ -498,17 +512,17 @@ def template_clean_data(p, clean_data, features, items, cleaners_names, filter_n
                                 p(f)
                                 p(u'</input>')
                                 p(html.br())
-            with html.tr(p):
+            with p(html.tr()):
                 p(html.td(u'&nbsp;'))
                 for f in features:
-                    with html.td_block(p, {u'valign':u'top'}):
+                    with p(html.td_block({u'valign':u'top'})):
                         p(html.b(f))
-            for i,item in enumerate(items):
-                with html.tr(p):
+            for item,row in zip(items, clean_data):
+                with p(html.tr()):
                     p(html.td(html.b(item)))
-                    for cell in clean_data[i]:
+                    for cell in row:
                         if isinstance(cell, ChangedFloat):
-                            p(html.td(html.b(u'%.6s ' % cell) + ('<span style="font-size:smaller;color:gray;">"%s"</span>' % cell.original)))
+                            p(html.td(html.b(u'%.6s ' % cell) + html.span(cell.original, {'style':'"font-size:smaller;color:gray;"'})))
                         else:
                             p(html.td('%.6s' % cell))
 
@@ -524,15 +538,17 @@ filter_funcs = {u'negate': lambda x: -1 * x,
                     
 
 
+@webify.template()
 def template_show_data(p, table):
     p(html.h2(u'Full table:'))
-    with html.div(p, {'style':'height:23em;overflow:scroll;'}):
-        partial_table(p, table)
+    with p(html.div({'style':'height:23em;overflow:scroll;'})):
+        p.sub(partial_table(table))
 
+@webify.template()
 def partial_table(p, table):
-    with html.table(p):
+    with p(html.table()):
         for row in table:
-            with html.tr(p):
+            with p(html.tr()):
                 for cell in row:
                     p(html.td(cell))
 
@@ -569,18 +585,14 @@ def upload(req, p):
         short_code = hashlib.md5(str(random.random())).hexdigest()[:15]
         p(template_upload_form(short_code))
 
-def template_upload_form(short_code):
-    yield u'<form method="POST" enctype="multipart/form-data" action="%s">' % upload.url()
-    yield u'Please upload a properly formatted CSV'
-    yield u'<br />'
-    yield u'<input type="text" name="short_code" value="%s" />' % short_code
-    yield u'<input type="file" name="csv" />'
-    yield u'<input type="submit" value="Upload" />'
-    yield u'</form>'
-
-    
-    
-    
+@webify.template()
+def template_upload_form(p, short_code):
+    with p(html.form({'enctype':'multipart/form-data','action':upload.url()})):
+        p(u'Please upload a properly formatted CSV')
+        p(html.br())
+        p(html.input_text('short_code', short_code))
+        p(html.input_file(name='csv'))
+        p(html.input_submit(value='Upload'))
 
 # Middleware
 from webify.middleware import install_middleware, EvalException, SettingsMiddleware
@@ -599,5 +611,5 @@ if __name__ == '__main__':
                                                 EvalException,
                                                ])
     print 'Loading server...'
-    server.serve(wrapped_app, host='127.0.0.1', port=8085, reload=True)
+    server.serve(wrapped_app, host='0.0.0.0', port=8085, reload=True)
 
