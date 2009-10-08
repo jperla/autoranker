@@ -26,7 +26,7 @@ app = webify.defaults.app()
 def index(req, p):
     csv_location = req.settings[u'csv_location']
     files = [unicode(f) 
-                for f in os.listdir(csv_location) if not f.endswith('json')]
+                for f in os.listdir(csv_location) if not f.endswith(u'json')]
     p(template_index(files))
 
 @webify.template()
@@ -42,16 +42,16 @@ def csv_data_to_table(data):
     reader = csv.reader(StringIO.StringIO(data))
     rows = []
     for line in reader:
-        rows.append([c.decode('utf8') for c in line])
+        rows.append([c.decode(u'utf8') for c in line])
     return rows
 
 def extract_features(table):
     first_row = table[0]
-    features = [r.strip(' \r\n') for r in first_row[1:]]
+    features = [r.strip(u' \r\n') for r in first_row[1:]]
     return features
 
 def extract_items(table):
-    items = [row[0].strip(' \r\n') for row in table[1:]]
+    items = [row[0].strip(u' \r\n') for row in table[1:]]
     return items
 
 def extract_raw_data(table):
@@ -102,7 +102,7 @@ def new_data(req, p):
     
     equation = {}
     for f in data[u'features']:
-        assert(f.startswith('feature_'))
+        assert(f.startswith(u'feature_'))
          # Negate everything because it's position from top
         feature_id = int(f[8:])
         value = data[u'features'][f]
@@ -321,8 +321,8 @@ def template_rankings(p, items, rankings):
                 p(u'<button id="rerank">Re-rank</button>')
             with p(html.td_block({u'valign':u'top'})):
                 p(u'<img src="http://www.labmeeting.com/images/upload/spinner.gif" style="display:none;" id="loading" />')
-    r = ['%s (%s)' % (html.b(items[i]), html.span_smaller('%s' % score))
-                                    for score,i in rankings]
+    r = [u'%s (%s)' % (html.b(items[i]), html.span_smaller(u'%s' % score))
+                                                    for score,i in rankings]
     p.sub(partial_list(r))
 
 def calculate_rankings(normalized_data, equation):
@@ -396,16 +396,16 @@ def load_cleaners_names(csv_location, short_code):
 
 def save_properties(csv_location, short_code, properties):
     assert(short_code_valid(short_code))
-    data_path = os.path.join(csv_location, '%s.json' % short_code)
-    with open(data_path, 'w') as f:
+    data_path = os.path.join(csv_location, u'%s.json' % short_code)
+    with open(data_path, u'w') as f:
         f.write(simplejson.dumps(properties))
 
 def load_properties(csv_location, short_code):
     assert(short_code_valid(short_code))
-    data_path = os.path.join(csv_location, '%s.json' % short_code)
+    data_path = os.path.join(csv_location, u'%s.json' % short_code)
     if not os.path.exists(data_path):
         save_properties(csv_location, short_code, {})
-    with open(data_path, 'r') as f:
+    with open(data_path, u'r') as f:
         properties = simplejson.loads(f.read())
     return properties
     
@@ -522,7 +522,7 @@ def template_clean_data(p, clean_data, features, items, cleaners_names, filter_n
                     p(html.td(html.b(item)))
                     for cell in row:
                         if isinstance(cell, ChangedFloat):
-                            p(html.td(html.b(u'%.6s ' % cell) + html.span(cell.original, {'style':'"font-size:smaller;color:gray;"'})))
+                            p(html.td(html.b(u'%.6s ' % cell) + html.span(cell.original, {u'style':u'"font-size:smaller;color:gray;"'})))
                         else:
                             p(html.td('%.6s' % cell))
 
@@ -587,21 +587,21 @@ def upload(req, p):
 
 @webify.template()
 def template_upload_form(p, short_code):
-    with p(html.form({'enctype':'multipart/form-data','action':upload.url()})):
+    with p(html.form({u'enctype':u'multipart/form-data',u'action':upload.url()})):
         p(u'Please upload a properly formatted CSV')
         p(html.br())
-        p(html.input_text('short_code', short_code))
-        p(html.input_file(name='csv'))
-        p(html.input_submit(value='Upload'))
+        p(html.input_text(u'short_code', short_code))
+        p(html.input_file(name=u'csv'))
+        p(html.input_submit(value=u'Upload'))
 
 # Middleware
 from webify.middleware import install_middleware, EvalException, SettingsMiddleware
 
 # Server
 from webify.http import server
-if __name__ == '__main__':
+if __name__ == u'__main__':
     settings = {
-                'csv_location': 'csvs/',
+                u'csv_location': u'csvs/',
                }
 
     wsgi_app = webify.wsgify(app)
@@ -611,5 +611,5 @@ if __name__ == '__main__':
                                                 EvalException,
                                                ])
     print 'Loading server...'
-    server.serve(wrapped_app, host='0.0.0.0', port=8085, reload=True)
+    server.serve(wrapped_app, host=u'0.0.0.0', port=8085, reload=True)
 
